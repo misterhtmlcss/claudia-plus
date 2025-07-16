@@ -92,8 +92,8 @@ export const UsageDashboard: React.FC<UsageDashboardProps> = ({ onBack }) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 4
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
     }).format(amount);
   };
 
@@ -124,6 +124,41 @@ export const UsageDashboard: React.FC<UsageDashboardProps> = ({ onBack }) => {
     if (model.includes("opus")) return "text-purple-500";
     if (model.includes("sonnet")) return "text-blue-500";
     return "text-gray-500";
+  };
+
+  const getLatestProjects = () => {
+    if (!sessionStats) return stats.by_project.slice(0, 5);
+    
+    // Group sessions by project path and aggregate
+    const projectMap = new Map<string, {
+      project_path: string;
+      project_name: string;
+      total_cost: number;
+      last_used: string;
+    }>();
+
+    sessionStats.forEach(session => {
+      const existing = projectMap.get(session.project_path);
+      if (existing) {
+        existing.total_cost += session.total_cost;
+        // Keep the most recent last_used date
+        if (new Date(session.last_used) > new Date(existing.last_used)) {
+          existing.last_used = session.last_used;
+        }
+      } else {
+        projectMap.set(session.project_path, {
+          project_path: session.project_path,
+          project_name: session.project_name,
+          total_cost: session.total_cost,
+          last_used: session.last_used
+        });
+      }
+    });
+
+    // Convert to array and sort by most recent last_used
+    return Array.from(projectMap.values())
+      .sort((a, b) => new Date(b.last_used).getTime() - new Date(a.last_used).getTime())
+      .slice(0, 5);
   };
 
   return (
@@ -315,16 +350,16 @@ export const UsageDashboard: React.FC<UsageDashboardProps> = ({ onBack }) => {
                   </Card>
 
                   <Card className="p-6">
-                    <h3 className="text-sm font-semibold mb-4">Top Projects</h3>
+                    <h3 className="text-sm font-semibold mb-4">Latest Projects</h3>
                     <div className="space-y-3">
-                      {stats.by_project.slice(0, 3).map((project) => (
+                      {getLatestProjects().map((project) => (
                         <div key={project.project_path} className="flex items-center justify-between">
                           <div className="flex flex-col">
                             <span className="text-sm font-medium truncate max-w-[200px]" title={project.project_path}>
-                              {project.project_path}
+                              {project.project_path.split('/').pop() || project.project_path}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                              {project.session_count} sessions
+                              {'last_used' in project ? new Date(project.last_used).toLocaleDateString() : 'Recent activity'}
                             </span>
                           </div>
                           <span className="text-sm font-medium">
